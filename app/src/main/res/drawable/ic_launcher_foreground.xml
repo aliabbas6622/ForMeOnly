@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Shadow for depth -->
+    <path
+        android:fillColor="#22000000"
+        android:pathData="M32,32h44v44h-44z" />
+
+    <!-- Bottom Layer (Photo Frame) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,30h40v48h-40z"
+        android:strokeWidth="1"
+        android:strokeColor="#DDDDDD" />
+    <path
+        android:fillColor="#E0F2F1"
+        android:pathData="M34,34h32v32h-32z" />
+
+    <!-- Top Layer (Active Wallpaper) -->
+    <group android:translateX="8" android:translateY="8">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,30h40v48h-40z" />
+        <!-- Image Area -->
+        <path
+            android:fillColor="#0F766E"
+            android:pathData="M33,33h34v34h-34z" />
+        <!-- Mountain/Landscape -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M33,67 L45,52 L52,60 L58,54 L67,67 Z" />
+        <!-- Sun -->
+        <path
+            android:fillColor="#F59E0B"
+            android:pathData="M58,42 a4,4 0 1 1 0.1,0 z" />
+    </group>
+
+    <!-- Rotation Arrow -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M78,25 c3,3 5,7 5,11 l-4,0 c0,-3 -1.5,-6 -4,-8 l3,-3 z M83,36 l4,-4 l-8,0 l0,8 l4,-4 z" />
+</vector>

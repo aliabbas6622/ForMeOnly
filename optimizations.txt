@@ -1,0 +1,228 @@
+**Google Pixel 7a | Android 16 Baklava
+Refactoring a Wallpaper Rotation App – The Definitive Optimization Prompt**
+
+---
+
+## Part 1: Device & OS Statistics (What You're Targeting)
+
+Before we start the audit, first, understand the real performance and behavioral envelope of the actual hardware and operating system.
+
+### Google Pixel 7a – Key Hardware Parameters
+
+| Hardware Parameter | Specification |
+|---|---|
+| **Display** | 6.1‑inch OLED, 1080 × 2400 pixels, 90 Hz |
+| **SoC** | Google Tensor G2 (5 nm) |
+| **CPU** | Octa‑core: 2 × 2.85 GHz Cortex‑X1, 2 × 2.35 GHz Cortex‑A78, 4 × 1.80 GHz Cortex‑A55 |
+| **GPU** | Mali‑G710 MP7 |
+| **RAM** | 8 GB LPDDR5 |
+| **Storage** | 128 GB UFS 3.1 (no card slot) |
+| **Battery** | 4385 mAh, non‑removable Li‑Polymer |
+| **Dimensions** | 152 × 72.9 × 9 mm, 193.5 g |
+| **Android at launch** | Android 13 (upgradable to Android 16) |
+
+Sources: Google Shopping product specs, Videotron tech specifications, GSMArena, Notebookcheck.
+
+### Android 16 Baklava (API 36) – Relevant System Behavior Changes for This App
+
+Android 16 introduces several critical changes that directly affect a wallpaper rotation service. You must adapt to these, not work around them:
+
+- **Foreground service restrictions** – Apps must declare explicit foreground service types. Jobs launched from a foreground service adhere to runtime quotas, meaning you cannot schedule arbitrary work in the background without constraints.
+- **Exact alarm permission** – `setExact()` alarms now require `USE_EXACT_ALARM` permission. For wallpaper rotation intervals longer than 1 minute, prefer inexact alarms or `WorkManager` to minimize battery impact.
+- **Background execution limits** – The system aggressively limits background work. Apps that are not in active use have their background service capabilities curtailed.
+- **16 KB page size compatibility** – Android 16 introduces 16 KB memory pages. While not directly affecting bitmap sizes, this changes memory allocation patterns for long‑running services. Avoid unnecessary object allocations that could cause page fragmentation.
+- **Photo picker mandatory** – You must use the system photo picker if the user ever selects wallpapers manually. Direct `READ_EXTERNAL_STORAGE` is no longer permitted.
+- **No backward compatibility assumptions** – With `targetSdkVersion = 36`, legacy APIs (e.g., `AsyncTask`, `LoaderManager`, old `AlarmManager` behaviors) are either removed or behave differently.
+
+---
+
+## Part 2: The Refactoring Prompt (with Statistical Targets)
+
+Analyze the existing Android wallpaper rotation application and refactor it for maximum efficiency on a **Google Pixel 7a** running **Android 16 (API 36)**.
+
+**Do not rebuild the project from scratch.** Preserve all existing functionality while improving performance, reliability, memory usage, battery consumption, and code quality.
+
+### Quantitative Performance Targets
+
+After refactoring, the app must meet or exceed these statistical targets:
+
+| Metric | Baseline (current, estimated) | Target (refactored) |
+|---|---|---|
+| Idle battery drain | >1.5% per hour | **≤0.25% per hour** (≈11 mA average on a 4385 mAh battery) |
+| CPU usage while idle | >5% average | **≤0.8% average** (averaged over any 10‑minute window) |
+| Wakeups per hour (alarm + wakelock) | >60 | **≤6** (Android 16 background execution limits permit no more than this) |
+| Memory footprint (PSS) | >120 MB | **≤40 MB** |
+| Memory growth over 30 days | >30 MB | **≤3 MB** |
+| Wallpaper change latency (timer to applied) | >200 ms | **≤40 ms** (10 ms decode on background thread + 30 ms apply) |
+| Time to preload next wallpaper | N/A | **≤120 ms** background |
+| Folder scan time (100 images, UFS 3.1) | >800 ms | **≤120 ms** (cached) |
+| Redundant folder scans per day | 10+ | **0** (event‑driven only) |
+| Image decode memory per wallpaper | Full resolution (>10 MB) | **≤1.8 MB** (sampled to 1080×2400, 4 bytes per pixel) |
+| Service uptime before OOM/crash | <7 days | **≥45 days** (due to stricter Android 16 process management) |
+| Failed wallpaper skip rate | N/A | **<0.05%** of changes |
+
+---
+
+## Part 3: Performance Audit – Find These First
+
+### Identify and Quantify:
+
+- **Unnecessary object allocations** – Measure allocation rate in idle state (e.g., via `Debug.getAllocCount()`). Target: <50 allocations per minute while idle.
+- **Repeated folder scans** – Log current scan frequency. Compare with actual filesystem modification timestamps.
+- **Main‑thread work** – Use `StrictMode` or trace to identify any operation >16 ms on the main thread.
+- **Memory leaks** – Measure activity/fragment retention after configuration changes using LeakCanary or `android.app.usage.StorageStatsManager`.
+- **Excessive bitmap creation** – Count how many bitmaps exist per wallpaper change cycle. Target: ≤2 active bitmaps at any time.
+- **Inefficient timers** – Measure drift per 24 hours. Target: <50 ms drift (Android 16 allows you to sync with `SystemClock.elapsedRealtime()`).
+- **Redundant service operations** – Log identical operations repeated within 10‑second windows (e.g., same file checks, same preference reads).
+- **Battery‑draining behavior** – Measure wakelock duration (target: <1 second per change). Count network usage (should be zero).
+- **Unused dependencies** – Run `./gradlew app:dependencies` and identify libraries not used by the wallpaper rotation feature.
+- **Expensive I/O operations** – Measure average milliseconds per file read. On UFS 3.1, random reads are ~200 MB/s, so a 5 MB read should take <25 ms.
+
+**Generate a report of findings** before applying changes, with before/after estimates.
+
+---
+
+## Part 4: Image Optimization – Android 16 Native Approach
+
+### Required Changes:
+
+- **Cache image paths after initial scan** – Maintain `LastModified` timestamps. Rescan only when directory modification time changes.
+- **Avoid repeated directory traversal** – Target: 0 traversals per hour except after explicit refresh or directory change detection.
+- **Decode images using sampling** – Use `BitmapFactory.Options.inSampleSize` calculated from the device's target dimensions (1080×2400). The maximum reasonable inSampleSize for most wallpapers is 4 (reducing memory by factor of 16).
+- **Resize images** – Final bitmap ≤1.8 MB in memory (1080×2400×4 bytes). Average uncompressed wallpaper might be 25–40 MB; this is a memory reduction of >95%.
+- **Minimize bitmap allocations** – Use a bitmap pool of size 2. Reuse the pool when possible.
+- **Keep only current and next wallpaper in memory** – Release the previous wallpaper immediately after the new one is applied.
+- **Release resources** – Call `bitmap.recycle()` explicitly when a bitmap is no longer in use. Verify with `NativeAllocationRegistry` tracking.
+- **Handle corrupted images gracefully** – Skip with a log entry. Maintain a skip count per image; after 2 failures, blacklist the file and skip it permanently.
+
+---
+
+## Part 5: Wallpaper Engine Optimization – Drift‑Free, Preloaded, Instant
+
+### Required Changes:
+
+- **Preload the next wallpaper** – Start background decode when time remaining <15 seconds.
+- **Prepare image processing on background threads** – Use `Dispatchers.IO` with low priority (`Dispatchers.IO + SupervisorJob`). Keep main thread work under 1 ms.
+- **Apply wallpaper instantly** – Use `WallpaperManager.setBitmap()` with the pre‑scaled bitmap. Target apply time ≤10 ms.
+- **Avoid visible delays** – Double‑buffer the next wallpaper. Probability of a delay >16 ms should be <0.5%.
+- **Skip problematic images automatically** – Retry exactly once after a failure. If it fails again, blacklist the file and skip it forever.
+
+---
+
+## Part 6: Scheduling Improvements – Wakeup‑Aware, Android 16 Compliant
+
+Replace any naive timer implementation with a system that respects Android 16 background limits.
+
+- **For intervals ≥15 minutes** – Use `WorkManager` with `ExistingWorkPolicy.KEEP` and `setExpedited()` only for the actual wallpaper change. WorkManager automatically handles device sleep/wake.
+- **For intervals <15 minutes** – Use `Handler` with timestamp correction, but ensure you hold a wake lock only during the actual change. Do not hold it between changes.
+- **Drift prevention** – On each alarm, calculate the next execution time as `lastExecutionTime + interval`. Adjust for any drift using `SystemClock.elapsedRealtime()`.
+- **Recovery after interruption** – On service start, check the last wallpaper change time from persistent storage. If an interval was missed, trigger an immediate change and then reschedule from that point.
+- **Android 16 compliance** – Do not use `setExactAndAllowWhileIdle()` for intervals shorter than 15 minutes. The system may ignore your request. Use `WorkManager` with `setRequiredNetworkType(NOT_REQUIRED)` and `setRequiresBatteryNotLow(true)`.
+
+---
+
+## Part 7: Service Optimization – Foreground, Long‑Running, Battery‑Conscious
+
+Android 16 imposes strict rules on foreground services. Adapt as follows:
+
+- **Declare the correct foreground service type** – In `AndroidManifest.xml`, use `android:foregroundServiceType="mediaPlayback"` or `"dataSync"` depending on what the wallpaper rotation does. The type must match the actual work.
+- **Reduce wakeups** – Coalesce operations. Target ≤6 wakeups per hour (e.g., one alarm for the wallpaper change, plus occasional maintenance).
+- **Minimize CPU activity while idle** – Enter deep idle after each wallpaper change. CPU total <0.5% over any 5‑minute idle window.
+- **Prevent duplicate service instances** – Use `startForeground()` with a unique notification ID. Check for existing service in `onStartCommand`.
+- **Improve restart behavior** – On crash (which should be very rare), restore state from persistent storage in <100 ms.
+- **Improve lifecycle management** – Bind only when the UI is active. Release references in `onTrimMemory()`.
+- **Long‑term stability** – Add a watchdog that resets the wallpaper engine if a wallpaper change stalls for >30 seconds. Log the event and trigger a recovery.
+
+---
+
+## Part 8: Memory Optimization – Android 16 Native Heap & 16 KB Pages
+
+- **Bitmap reuse** – Maintain a `BitmapPool` of size 2, each up to (1080×2400×4 bytes) ≈ 10 MB. Total pool size ≤20 MB.
+- **Memory pressure handling** – Respond to `onTrimMemory()` by clearing the wallpaper cache (reduce to 1 stored bitmap). On `TRIM_MEMORY_COMPLETE`, recycle all cached bitmaps.
+- **Cache size limits** – LRU path cache ≤200 entries. Do not store bitmap caches longer than necessary.
+- **Resource cleanup** – Use `WeakReference` for callbacks to prevent leaks. Unregister any observers when not needed.
+- **Leak prevention** – Test with LeakCanary. Target zero leaks over 1000 configuration changes.
+
+**Goal:** Run continuously for **45 days** without memory growth exceeding **3 MB**.
+
+---
+
+## Part 9: Battery Optimization – Minimal Wakeups, Maximal Idle
+
+- **Avoid unnecessary disk reads** – Target average disk reads per hour ≤2 (only when changing wallpaper). Use cached paths for all other operations.
+- **Avoid repeated image decoding** – Decode each image exactly once before use. Do not re‑decode the same image for a later change.
+- **Reduce background processing** – No network. No sensor usage. No location.
+- **Eliminate polling** – Use `FileObserver` to detect directory changes instead of periodic scanning.
+- **Optimize coroutine usage** – Use `viewModelScope` and `lifecycleScope` for UI‑bound work. Never use `GlobalScope` for long‑running operations.
+- **Minimize wake locks** – Hold a wake lock only during the actual wallpaper change, for <1 second. Use `WorkManager` for all other background tasks.
+
+**Battery benchmark for Pixel 7a (4385 mAh):**
+
+- Idle with service but no wallpaper change: ≤10 mA average → **0.22% per hour** → >450 hours standby.
+- During wallpaper change (every 4 hours): spike ≤200 mA for ≤200 ms → negligible.
+
+---
+
+## Part 10: Android 16 – Take Full Advantage
+
+Since the app targets **API 36** and **Pixel 7a only**, do the following:
+
+- **Remove all backward compatibility code** – No AppCompat (unless required for UI), no `@RequiresApi` checks, no legacy storage helpers.
+- **Remove legacy workarounds** – No `ViewTreeObserver` hacks, no deprecated `AsyncTask`, no `LoaderManager`.
+- **Simplify version checks** – Assume `Build.VERSION.SDK_INT == 36`. Remove any branching logic for older APIs.
+- **Use modern APIs directly** – `WallpaperManager` (Android 16 uses the same API surface, but behavior regarding `setBitmap()` is more predictable). `BitmapFactory` with `inPreferredConfig = HardwareConfig` where possible to reduce memory.
+- **Test on Android 16** – Ensure foreground service restrictions do not break the rotation schedule. If the system kills the service, restart it and recover the schedule.
+
+---
+
+## Part 11: Architecture Refactoring
+
+Separate into these layers with clear interfaces:
+
+1. **UI Layer** – Jetpack Compose (or existing XML). No business logic.
+2. **Wallpaper Engine** – `WallpaperManager` wrapper, image decoding, preloading, double buffering.
+3. **Scheduler** – `WorkManager` for intervals ≥15 min, timestamp‑corrected `Handler` for shorter intervals.
+4. **Repository** – Image path caching, file change detection (`FileObserver`), blacklist.
+5. **Service Layer** – Foreground service with lifecycle‑aware components. Handles only the wallpaper change and preloading.
+6. **Settings Layer** – DataStore with Flow. No `SharedPreferences` blocking reads.
+
+**Complexity reduction:** Each method ≤15 lines. Each class ≤200 lines (except UI). Eliminate any unnecessary singletons.
+
+---
+
+## Part 12: Monitoring – Developer Diagnostics Screen
+
+Add a real‑time diagnostics screen (update every 1 second when visible) that shows:
+
+- **Memory usage** – PSS, native heap, Java heap (in MB). Use `Debug.MemoryInfo`.
+- **Cached image count** – Number of paths in cache. Bitmap count (active + next).
+- **Last wallpaper change** – Time and duration (decode + apply in ms).
+- **Next wallpaper change** – Countdown timer.
+- **Service uptime** – Days: hours: minutes.
+- **Failed attempts** – Last 24 hours, total.
+- **Average processing time** – Moving average of the last 10 wallpaper changes.
+- **Battery impact estimate** – Wakeups per hour, CPU active time percentage.
+- **Cache hit ratio** – Paths found in cache divided by total lookups.
+
+---
+
+## Part 13: Deliverables
+
+After refactoring, provide:
+
+1. **Every optimization applied** – With statistical justification (e.g., "reduced scans from 10/hour to 0 → saves 0.2% battery per hour").
+2. **Expected battery improvement** – Estimated mA savings per hour, percentage vs. baseline.
+3. **Expected memory improvement** – Peak PSS reduction, leak‑free guarantee.
+4. **Expected reliability improvement** – MTBF increase, crash rate reduction.
+5. **Remaining bottlenecks** – Quantify any remaining overhead (e.g., filesystem read on every change: ~20 ms).
+6. **Benchmark estimates for Pixel 7a, Android 16** – Fill in the measured values:
+
+| Metric | Value |
+|---|---|
+| Idle battery drain | ___ % per hour |
+| Memory after 45 days | ___ MB |
+| Wallpaper change latency (P95) | ___ ms |
+| CPU time per day (idle) | ___ seconds |
+| Disk reads per day | ___ |
+
+Focus on **measurable improvements**, not cosmetic changes. Prioritize **battery life**, **memory efficiency**, and **long‑term stability** on **Android 16**. Provide diffs and before/after logs.

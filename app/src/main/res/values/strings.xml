@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ForMeOnly</string>
+    <string name="select_folder">Select Folder</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="interval">Interval</string>
+    <string name="wallpaper_size">Wallpaper size</string>
+    <string name="preview_wallpaper">Preview Wallpaper</string>
+    <string name="wallpaper_preview">Wallpaper preview</string>
+    <string name="close">Close</string>
+    <string name="mode">Mode</string>
+    <string name="sequential">Sequential</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="next_wallpaper">Next wallpaper</string>
+    <string name="no_folder_selected">No folder selected</string>
+    <string name="status_running">Running</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="change_now">Change Now</string>
+    <string name="choose_folder_first">Choose an image folder first.</string>
+    <string name="notification_channel">Wallpaper rotation</string>
+    <string name="notification_title">ForMeOnly is running</string>
+    <string name="notification_text">Changing wallpaper from your selected folder.</string>
+
+    <!-- Navigation & Core -->
+    <string name="tool_wallpaper">Wallpaper</string>
+    <string name="tool_alarm">Alarm Setter</string>
+
+    <!-- Alarm Setter Tool -->
+    <string name="alarm_settings">Alarm Configuration</string>
+    <string name="alarm_time">Alarm Time</string>
+    <string name="alarm_text">Alarm Message</string>
+    <string name="alarm_text_hint">Enter what the alarm should say...</string>
+    <string name="elevenlabs_settings">ElevenLabs API Settings (Optional)</string>
+    <string name="elevenlabs_key_hint">ElevenLabs API Key</string>
+    <string name="elevenlabs_voice">Select Voice</string>
+    <string name="set_alarm">Set Alarm</string>
+    <string name="tts_generating">Generating alarm audio...</string>
+    <string name="active_alarms">Active Alarms</string>
+    <string name="no_alarms">No active alarms scheduled</string>
+    <string name="alarm_set_success">Alarm set successfully!</string>
+    <string name="alarm_generation_failed">Failed to generate audio. Fallback failed.</string>
+    
+    <!-- Alarm Ringing screen -->
+    <string name="dismiss">Dismiss Alarm</string>
+    <string name="alarm_ringing">Alarm Ringing</string>
+    <string name="test_alarm">Test Alarm Now</string>
+</resources>
+
