@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.bshare.audio.ui.theme.BshareTheme
 
 /**
  * Main activity that handles permissions and hosts the Compose UI.
@@ -58,7 +59,7 @@ class MainActivity : ComponentActivity() {
         audioCaptureManager = AudioCaptureManager(this, deviceMixer, bluetoothRoutingManager)
         
         setContent {
-            MaterialTheme {
+            BshareTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
