@@ -5,6 +5,10 @@
         android:icon="@android:drawable/ic_menu_gallery"
         android:title="@string/tool_wallpaper" />
     <item
+        android:id="@+id/navigation_bshare"
+        android:icon="@android:drawable/ic_btn_speak_now"
+        android:title="@string/tool_bshare" />
+    <item
         android:id="@+id/navigation_alarm"
         android:icon="@android:drawable/ic_lock_idle_alarm"
         android:title="@string/tool_alarm" />

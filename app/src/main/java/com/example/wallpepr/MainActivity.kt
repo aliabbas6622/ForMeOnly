@@ -14,6 +14,7 @@ class MainActivity : Activity() {
 
     private val tools = listOf(
         WallpaperTool(),
+        BshareTool(),
         AlarmTool()
     )
     private var activeTool: Tool? = null
@@ -28,6 +29,7 @@ class MainActivity : Activity() {
         bottomNavigation.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.navigation_wallpaper -> switchTool("wallpaper")
+                R.id.navigation_bshare -> switchTool("bshare")
                 R.id.navigation_alarm -> switchTool("alarm")
                 else -> false
             }
