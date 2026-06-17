@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,14 +15,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.bshare.audio.service.BatteryOptimizedForegroundService
 import com.bshare.audio.ui.theme.BshareTheme
 
 /**
  * Main activity that handles permissions and hosts the Compose UI.
+ * Optimized for minimal main-thread work and proper lifecycle management.
  */
 class MainActivity : ComponentActivity() {
     
     companion object {
+        private const val TAG = "MainActivity"
         private const val REQUEST_MEDIA_PROJECTION = 1001
     }
     
@@ -35,8 +39,9 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val allGranted = permissions.all { it.value }
         if (allGranted) {
-            // All permissions granted, start audio capture
-            startAudioCapture()
+            Log.d(TAG, "All permissions granted")
+            // All permissions granted, start foreground service
+            startForegroundService()
         } else {
             // Handle missing permissions
             handleMissingPermissions()
@@ -81,8 +86,10 @@ class MainActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "Activity destroyed, cleaning up")
         bluetoothRoutingManager.unregisterAudioDeviceCallback()
-        audioCaptureManager.stopAudioCapture()
+        audioCaptureManager.cleanup()
+        deviceMixer.cleanup()
     }
     
     /**
@@ -106,9 +113,11 @@ class MainActivity : ComponentActivity() {
         
         if (permissionsToRequest.isEmpty()) {
             // All permissions already granted
-            startAudioCapture()
+            Log.d(TAG, "All permissions already granted")
+            startForegroundService()
         } else {
             // Request missing permissions
+            Log.d(TAG, "Requesting permissions: ${permissionsToRequest.joinToString()}")
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
@@ -117,15 +126,24 @@ class MainActivity : ComponentActivity() {
      * Handle missing permissions
      */
     private fun handleMissingPermissions() {
-        // Show dialog or navigate to settings
-        // For now, we'll just log it
-        android.util.Log.w("MainActivity", "Some permissions were denied")
+        Log.w(TAG, "Some permissions were denied by user")
+        // In production, show a dialog explaining why permissions are needed
+        // and provide a link to app settings
     }
     
     /**
-     * Start audio capture after permissions are granted
+     * Start foreground service for audio capture
      */
-    private fun startAudioCapture() {
+    private fun startForegroundService() {
+        Log.d(TAG, "Starting foreground service")
+        val serviceIntent = Intent(this, BatteryOptimizedForegroundService::class.java)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        
         // Request media projection for system audio capture
         requestMediaProjection()
     }
